@@ -2,10 +2,14 @@
   "author": "James Milne (milne.james@gmail.com)",
   "license": "MIT",
   "name": "pgc_isy_manager",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Polyglot v2 Swarm ISY Manager",
   "main": "isy_manager.js",
   "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/UniversalDevicesInc/pgc_isy_manager.git"
+  },
   "dependencies": {
     "aws-sdk": "^2.387.0",
     "dotenv": "6.2.0",

@@ -6,7 +6,7 @@ ENV STAGE $STAGE
 RUN mkdir -p /app/
 
 WORKDIR /app
-COPY package.json isy_manager.js /app/
+COPY package.json isy_manager.js secrets.js /app/
 
 RUN npm install
 ENTRYPOINT [ "node", "isy_manager.js"]
