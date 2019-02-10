@@ -10,9 +10,12 @@ const querystring = require('querystring')
 
 // Parameters
 const STAGE = process.env.STAGE
+const LOCAL = process.env.LOCAL || false
+
 const USER_TABLE = `pg_${STAGE}-usersTable`
 const ISY_TABLE = `pg_${STAGE}-isysTable`
 const NS_TABLE = `pg_${STAGE}-nsTable`
+
 const SECRETS = require('./secrets')
 const AWS_ACCESS_KEY_ID = SECRETS.get('SWARM_AWS_ACCESS_KEY_ID')
 const AWS_SECRET_ACCESS_KEY = SECRETS.get('SWARM_AWS_SECRET_ACCESS_KEY')
