@@ -1,5 +1,8 @@
 'use strict'
 
+const PACKAGE = require('./package.json')
+const VERSION = PACKAGE.version
+
 const rp = require('request-promise-native')
 rp.debug = false
 const xmlparser = require('xml2json-light')
@@ -10,20 +13,16 @@ const STAGE = process.env.STAGE
 const USER_TABLE = `pg_${STAGE}-usersTable`
 const ISY_TABLE = `pg_${STAGE}-isysTable`
 const NS_TABLE = `pg_${STAGE}-nsTable`
-let PARAMS = {}
-let USERCACHE = {}
 
 const MAX_RETRIES = 2
 
 const AWS = require('aws-sdk')
-console.log(`Running in Stage: ${STAGE}`)
-if (process.env.NODE_ENV === 'dev') {
-  let credentials = new AWS.SharedIniFileCredentials({profile: 'udi'})
-  AWS.config.credentials = credentials
-}
 AWS.config.update({region:'us-east-1', correctClockSkew: true})
-const sqs = new AWS.SQS()
-let iotData
+const SQS = new AWS.SQS()
+
+let PARAMS = {}
+let USERCACHE = {}
+let IOT
 
 let keepAliveOptions = {
   keepAlive: true,
@@ -35,8 +34,11 @@ let keepAliveOptions = {
 const httpsAgent = new require('https').Agent(keepAliveOptions)
 
 async function configAWS() {
-  iotData = new AWS.IotData({endpoint: `${PARAMS.IOT_ENDPOINT_HOST}`})
+  IOT = new AWS.IotData({endpoint: `${PARAMS.IOT_ENDPOINT_HOST}`})
 }
+
+console.log(`Worker Manager Version: ${VERSION} :: Stage: ${STAGE}`)
+console.log(`ENV: ${JSON.stringify(process.env)}`)
 
 // Logger intercept for easy logging in the future.
 const LOGGER = {
@@ -685,7 +687,7 @@ async function mqttSend(topic, message, qos = 0) {
     payload: payload,
     qos: qos
   }
-  return iotData.publish(iotMessage).promise()
+  return IOT.publish(iotMessage).promise()
 }
 
 // Make MQTT Response
@@ -830,7 +832,7 @@ async function getMessages() {
   }
   try {
     LOGGER.info(`Getting messages...`)
-    let data = await sqs.receiveMessage(params).promise()
+    let data = await SQS.receiveMessage(params).promise()
     if (data.Messages) {
         LOGGER.info(`Got ${data.Messages.length} message(s)`)
         let tasks = []
@@ -851,7 +853,7 @@ async function getMessages() {
         for (let task of tasks) {
           await task
         }
-        let deleted = await sqs.deleteMessageBatch(deletedParams).promise()
+        let deleted = await SQS.deleteMessageBatch(deletedParams).promise()
         deletedParams.Entries = []
         LOGGER.info(`Deleted Messages: ${JSON.stringify(deleted)}`)
     } else {
@@ -881,6 +883,18 @@ async function getParameters(nextToken) {
   }
 }
 
+async function startHealthCheck() {
+  require('http').createServer(function(request, response) {
+    if (request.url === '/health' && request.method ==='GET') {
+        //AWS ELB pings this URL to make sure the instance is running smoothly
+        let data = JSON.stringify({uptime: process.uptime()})
+        response.writeHead(200, {'Content-Type': 'application/json'})
+        response.write(data)
+        response.end()
+    }
+  }).listen(3000)
+}
+
 async function checkUserCache() {
   let validDuration = 1000 * 60 * 60 * 24 // 24 Hours
   let currentTime = +Date.now()
@@ -899,6 +913,7 @@ async function main() {
   }
   LOGGER.info(`Retrieved Parameters from AWS Parameter Store for Stage: ${STAGE}`)
   await configAWS()
+  startHealthCheck()
   setInterval(checkUserCache, 15 * 60 * 1000) // run every 15 minutes
   try {
     while (true) {
@@ -910,5 +925,14 @@ async function main() {
   }
 
 }
+
+['SIGINT', 'SIGTERM'].forEach(signal => {
+  process.on(signal, () => {
+    LOGGER.debug('Shutdown requested. Exiting...')
+    setTimeout(() => {
+      process.exit()
+    }, 500)
+  })
+})
 
 main()
