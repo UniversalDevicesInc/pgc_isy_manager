@@ -290,27 +290,29 @@ async function isyGetNodeServers(cmd, fullMsg) {
   if (!isyResponse.success) return LOGGER.error(`isyGetNodeServers: Connection to ISY unsuccessful. Please try your request again.`, fullMsg.userId)
   let returnValue = await getDbNodeServers(fullMsg.id, fullMsg.userId)
   let nodeServers = isyResponse.json
-  if (!nodeServers || !nodeServers.hasOwnProperty('connections') || !nodeServers.connections.hasOwnProperty('connection')) {
+  if (!nodeServers || !nodeServers.hasOwnProperty('connections')) {
     LOGGER.error(`isyGetNodeServers: Response wasn't XML or didn't have the connections property. This typically happens on ISY with firmware < 5.0`, fullMsg.userId)
   } else {
     let foundNS = []
-    if (Array.isArray(nodeServers.connections.connection)) {
-      for (let ns of nodeServers.connections.connection) {
+    if (nodeServers.connections.hasOwnProperty('connection')) {
+      if (Array.isArray(nodeServers.connections.connection)) {
+        for (let ns of nodeServers.connections.connection) {
+          foundNS.push(ns.profile)
+          if (!returnValue.hasOwnProperty(ns.profile) || returnValue[ns.profile].type === 'unmanaged') {
+            let updated = await updateUnmanagedNodeServer(fullMsg.id, ns, fullMsg.userId)
+            if (updated) {
+              returnValue[ns.profile] = updated
+            }
+          }
+        }
+      } else {
+        let ns = nodeServers.connections.connection
         foundNS.push(ns.profile)
-        if (!returnValue.hasOwnProperty(ns.profile) || returnValue[ns.profile].type === 'unmanaged') {
+        if (!returnValue.hasOwnProperty(ns.profile) || returnValue[ns.profile].nstype === 'unmanaged') {
           let updated = await updateUnmanagedNodeServer(fullMsg.id, ns, fullMsg.userId)
           if (updated) {
             returnValue[ns.profile] = updated
           }
-        }
-      }
-    } else {
-      let ns = nodeServers.connections.connection
-      foundNS.push(ns.profile)
-      if (!returnValue.hasOwnProperty(ns.profile) || returnValue[ns.profile].nstype === 'unmanaged') {
-        let updated = await updateUnmanagedNodeServer(fullMsg.id, ns, fullMsg.userId)
-        if (updated) {
-          returnValue[ns.profile] = updated
         }
       }
     }
