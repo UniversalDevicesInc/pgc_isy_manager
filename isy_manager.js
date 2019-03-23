@@ -222,7 +222,12 @@ async function getDbNodeServers(id, userId) {
 // Portal Functions
 async function isyGetIsys(cmd, fullMsg) {
   // getIsys {}
+  let args = {
+    domain: fullMsg.userId,
+    subaccounts: true
+  }
   let api = 'api/isys'
+  api += `?${querystring.stringify(args)}`
   let isyResponse = await makeIsyRequest(api, fullMsg.userId, fullMsg.id, true)
   if (!isyResponse.success) return LOGGER.error(`isyGetIsys: Connection to ISY unsuccessful. Please try your request again.`, fullMsg.userId)
   let isys = isyResponse.json
