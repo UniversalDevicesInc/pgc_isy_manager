@@ -223,7 +223,6 @@ async function getDbNodeServers(id, userId) {
 async function isyGetIsys(cmd, fullMsg) {
   // getIsys {}
   let args = {
-    domain: fullMsg.userId,
     subaccounts: true
   }
   let api = 'api/isys'
