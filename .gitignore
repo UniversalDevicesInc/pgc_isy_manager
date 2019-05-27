@@ -85,3 +85,4 @@ run_local.sh
 create_service.sh
 create_manager-test.sh
 certs/*
+build_and_push.sh
