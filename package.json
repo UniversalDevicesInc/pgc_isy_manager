@@ -5,7 +5,12 @@
   "version": "1.0.3",
   "description": "Polyglot v2 Swarm ISY Manager",
   "main": "isy_manager.js",
-  "scripts": {},
+  "scripts": {
+    "dockerbuild": "docker build --rm -t einstein42/$npm_package_name:version-$npm_package_version .",
+    "dockerpush": "docker login && docker push einstein42/$npm_package_name:version-$npm_package_version",
+    "patchandrelease": "npm version patch --force",
+    "postversion": "git push && git push --tags"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/UniversalDevicesInc/pgc_isy_manager.git"
