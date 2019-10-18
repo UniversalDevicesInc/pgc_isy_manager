@@ -9,7 +9,7 @@ const xmlparser = require('xml2json-light')
 const querystring = require('querystring')
 
 // Parameters
-const STAGE = process.env.STAGE
+const STAGE = process.env.STAGE || 'test'
 const LOCAL = process.env.LOCAL || false
 
 const USER_TABLE = `pg_${STAGE}-usersTable`
@@ -219,7 +219,7 @@ async function isyGetIsys(cmd, fullMsg) {
   }
   let api = 'api/isys'
   api += `?${querystring.stringify(args)}`
-  let isyResponse = await makeIsyRequest(api, fullMsg.userId, fullMsg.id, true)
+  let isyResponse = await makeIsyRequest(cmd, fullMsg, api, fullMsg.userId, fullMsg.id, true)
   if (!isyResponse.success) return LOGGER.error(`isyGetIsys: Connection to ISY unsuccessful. Please try your request again.`, fullMsg.userId)
   let isys = isyResponse.json
   let returnValue = {}
@@ -278,11 +278,33 @@ async function isyGetIsys(cmd, fullMsg) {
   updateDbUser(fullMsg.userId, false, isyKeys)
 }
 
+
+async function isyGetNodeServer(cmd, fullMsg) {
+  let api = `rest/profiles/ns/${fullMsg.profileNum}/connection`
+  let isyResponse = await makeIsyRequest(cmd, fullMsg, api, fullMsg.userId, fullMsg.id, true)
+  if (!isyResponse.success) return LOGGER.error(`isyGetNodeServers: Connection to ISY unsuccessful. Please try your request again.`, fullMsg.userId)
+  let nodeServer = isyResponse.json
+  if (nodeServer && nodeServer.hasOwnProperty('connections') && !nodeServer.connections.hasOwnProperty('connection')) {
+    LOGGER.error(`isyGetNodeServer: NodeServer ${fullMsg.profileNum} not found on ISY. Removing.`)
+    let data = fullMsg[cmd]
+    LOGGER.debug(`isyGetNodeServer: data :: ${JSON.stringify(data)}`, fullMsg.userId)
+    await mqttSend(`${STAGE}/workers`, {
+      userId: fullMsg.userId,
+      topic: `${STAGE}/workers`,
+      result: {
+        success: true,
+        statusCode: isyResponse.statusCode
+      },
+      removeNodeServer: data
+    }, fullMsg)
+  }
+}
+
 // ISY Functions
 async function isyGetNodeServers(cmd, fullMsg) {
   // getNodeServers {}
   let api = 'rest/profiles/ns/0/connection'
-  let isyResponse = await makeIsyRequest(api, fullMsg.userId, fullMsg.id, true)
+  let isyResponse = await makeIsyRequest(cmd, fullMsg, api, fullMsg.userId, fullMsg.id, true)
   if (!isyResponse.success) return LOGGER.error(`isyGetNodeServers: Connection to ISY unsuccessful. Please try your request again.`, fullMsg.userId)
   let returnValue = await getDbNodeServers(fullMsg.id, fullMsg.userId)
   let nodeServers = isyResponse.json
@@ -337,7 +359,7 @@ async function isyAddNodeServer(cmd, fullMsg) {
     }
     let api = `rest/profiles/ns/${fullMsg.addNodeServer.profileNum}/connection/set/network`
     api += `?${querystring.stringify(args)}`
-    let isyResponse = await makeIsyRequest(api, fullMsg.userId, fullMsg.id, false)
+    let isyResponse = await makeIsyRequest(cmd, fullMsg, api, fullMsg.userId, fullMsg.id, false)
     await makeResponse(cmd, fullMsg, fullMsg[cmd], isyResponse)
   } catch (err) {
     LOGGER.error(`isyAddNodeServer: ${err}`, fullMsg.userId)
@@ -347,7 +369,7 @@ async function isyAddNodeServer(cmd, fullMsg) {
 async function isyRemoveNodeServer(cmd, fullMsg) {
   // removeNodeServer { profileNum: '3' }
   let api = `rest/profiles/ns/${fullMsg.removeNodeServer.profileNum}/connection/remove`
-  let isyResponse = await makeIsyRequest(api, fullMsg.userId, fullMsg.id, false)
+  let isyResponse = await makeIsyRequest(cmd, fullMsg, api, fullMsg.userId, fullMsg.id, false)
   await makeResponse(cmd, fullMsg, fullMsg[cmd], isyResponse)
 }
 
@@ -366,7 +388,7 @@ async function isyAddNode(cmd, fullMsg, batch = false) {
     }
     let api = `rest/ns/${fullMsg.profileNum}/nodes/${address}/add/${fullMsg[cmd].nodedefid}`
     api += `?${querystring.stringify(args)}`
-    let isyResponse = await makeIsyRequest(api, fullMsg.userId, fullMsg.id, true)
+    let isyResponse = await makeIsyRequest(cmd, fullMsg, api, fullMsg.userId, fullMsg.id, true)
     if (isyResponse.statusCode === 200) {
       isyGroupNode(fullMsg, address, primary)
       if (fullMsg[cmd].hint) {
@@ -385,7 +407,7 @@ async function isyAddNode(cmd, fullMsg, batch = false) {
 async function isyAddHint(cmd, fullMsg, address) {
   try {
     let api = `rest/ns/${fullMsg.profileNum}/nodes/${address}/set/hint/${fullMsg[cmd].hint}`
-    let isyResponse = await makeIsyRequest(api, fullMsg.userId, fullMsg.id, true)
+    let isyResponse = await makeIsyRequest(cmd, fullMsg, api, fullMsg.userId, fullMsg.id, true)
     if (isyResponse.statusCode === 200) {
       LOGGER.debug(`Successfully set ${address} hint to ${fullMsg[cmd].hint}`, fullMsg.userId)
     } else {
@@ -401,7 +423,7 @@ async function isyRemoveNode(cmd, fullMsg, batch = false) {
   try {
     let address = addNodePrefix(fullMsg.profileNum, fullMsg.removenode.address)
     let api = `rest/ns/${fullMsg.profileNum}/nodes/${address}/remove`
-    let isyResponse = await makeIsyRequest(api, fullMsg.userId, fullMsg.id, false)
+    let isyResponse = await makeIsyRequest(cmd, fullMsg, api, fullMsg.userId, fullMsg.id, false)
     if (batch) { return Object.assign({[cmd]: fullMsg[cmd]}, isyResponse) }
     makeResponse(cmd, fullMsg, fullMsg[cmd], isyResponse)
   } catch (err) {
@@ -418,7 +440,7 @@ async function isyUpdateNode(cmd, fullMsg) {
     }
     let api = `rest/ns/${fullMsg.profileNum}/nodes/${address}/change/${fullMsg[cmd].nodedefid}`
     if (args) { api += `?${querystring.stringify(args)}` }
-    let isyResponse = await makeIsyRequest(api, fullMsg.userId, fullMsg.id, true)
+    let isyResponse = await makeIsyRequest(cmd, fullMsg, api, fullMsg.userId, fullMsg.id, true)
     // makeResponse(cmd, fullMsg, fullMsg[cmd], isyResponse)
   } catch (err) {
     LOGGER.error(`isyUpdateNode: ${err}`, fullMsg.userId)
@@ -431,7 +453,7 @@ async function isyStatus(cmd, fullMsg, batch = false) {
     let address = addNodePrefix(fullMsg.profileNum, fullMsg.status.address)
     let api = `rest/ns/${fullMsg.profileNum}/nodes/${address}/report/status/${fullMsg.status.driver}`
     api += `/${fullMsg.status.value}/${fullMsg.status.uom}`
-    let isyResponse = await makeIsyRequest(api, fullMsg.userId, fullMsg.id, false)
+    let isyResponse = await makeIsyRequest(cmd, fullMsg, api, fullMsg.userId, fullMsg.id, false)
     if (batch) {
       return Object.assign(fullMsg[cmd], isyResponse)
     }
@@ -452,7 +474,7 @@ async function isyCommand(cmd, fullMsg) {
         api += `/${fullMsg.command.uom}`
       }
     }
-    let isyResponse = await makeIsyRequest(api, fullMsg.userId, fullMsg.id, false)
+    let isyResponse = await makeIsyRequest(cmd, fullMsg, api, fullMsg.userId, fullMsg.id, false)
     // makeResponse(cmd, fullMsg, fullMsg[cmd], isyResponse)
   } catch (err) {
     LOGGER.error(`isyCommand: ${err}`, fullMsg.userId)
@@ -464,7 +486,7 @@ async function isyReport(cmd, fullMsg) {
   try {
     let api = `rest/ns/${fullMsg.profileNum}/report/request/${fullMsg.report.requestId}`
     api += `/${fullMsg.report.success ? 'success' : 'fail'}`
-    let isyResponse = await makeIsyRequest(api, fullMsg.userId, fullMsg.id, false)
+    let isyResponse = await makeIsyRequest(cmd, fullMsg, api, fullMsg.userId, fullMsg.id, false)
     //await makeResponse(cmd, fullMsg, fullMsg[cmd], isyResponse)
   } catch (err) {
     LOGGER.error(`isyReport: ${err}`, fullMsg.userId)
@@ -595,7 +617,7 @@ async function batch(cmd, fullMsg) {
 }
 
 // Send to ISY
-async function makeIsyRequest(api, userId, id = false, fullResponse = false) {
+async function makeIsyRequest(cmd, fullMsg, api, userId, id = false, fullResponse = false) {
   let response = {
     json: false,
     statusCode: null,
@@ -650,6 +672,13 @@ async function makeIsyRequest(api, userId, id = false, fullResponse = false) {
           LOGGER.error(`ISYreq: url: ${url} :: statuscode ${res.statusCode} :: ${JSON.stringify(res.body)}`, userId)
           response.statusCode = res.statusCode
           response.error = `ISYreq: url: ${url} :: statuscode ${res.statusCode} :: ${JSON.stringify(res.body)}`
+          return response
+        }
+        if (res && res.statusCode === 404) {
+          LOGGER.error(`ISYreq: url: ${url} :: statuscode ${res.statusCode} :: ${JSON.stringify(res.body)}`, userId)
+          response.statusCode = res.statusCode
+          response.error = `ISYreq: url: ${url} :: statuscode ${res.statusCode} :: ${JSON.stringify(res.body)}`
+          await isyGetNodeServer(cmd, fullMsg)
           return response
         }
         if (res && res.statusCode === 200) { response.success = true }

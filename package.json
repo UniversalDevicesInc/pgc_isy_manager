@@ -2,10 +2,11 @@
   "author": "James Milne (milne.james@gmail.com)",
   "license": "MIT",
   "name": "pgc_isy_manager",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Polyglot v2 Swarm ISY Manager",
   "main": "isy_manager.js",
   "scripts": {
+    "start:dev": "AWS_PROFILE=pgc-test LOCAL=true nodemon isy_manager.js",
     "dockerbuild": "docker build --rm -t einstein42/$npm_package_name:version-$npm_package_version .",
     "dockerpush": "docker login && docker push einstein42/$npm_package_name:version-$npm_package_version",
     "patchandrelease": "npm version patch --force",
