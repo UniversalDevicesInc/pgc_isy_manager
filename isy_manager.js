@@ -627,6 +627,10 @@ async function makeIsyRequest(cmd, fullMsg, api, userId, id = false, fullRespons
     seq: false
   }
   try {
+    let uuid = id
+    if (fullMsg && fullMsg.hasOwnProperty('id')) {
+      uuid = fullMsg.id.replace(/:/g,'')
+    }
     var hrstart = process.hrtime()
     let user = USERCACHE[userId] || await getDbUser(userId)
     if (!user) {
@@ -668,16 +672,15 @@ async function makeIsyRequest(cmd, fullMsg, api, userId, id = false, fullRespons
     for (let i = 0; i <= MAX_RETRIES; i++) {
       try {
         let res = await rp(apiOptions)
-        if (res && (res.statusCode === 500 || res.statusCode === 401)) {
-          LOGGER.error(`ISYreq: url: ${url} :: statuscode ${res.statusCode} :: ${JSON.stringify(res.body)}`, userId)
+        if (res && (res.statusCode === 500 || res.statusCode === 401 || res.statusCode === 503)) {
+          LOGGER.error(`${res.statusCode} :: ${uuid} - ${url} :: ${JSON.stringify(res.body)}`, userId)
           response.statusCode = res.statusCode
           response.error = `ISYreq: url: ${url} :: statuscode ${res.statusCode} :: ${JSON.stringify(res.body)}`
           return response
         }
         if (res && res.statusCode === 404) {
-          LOGGER.error(`ISYreq: url: ${url} :: statuscode ${res.statusCode} :: ${JSON.stringify(res.body)}`, userId)
+          LOGGER.error(`${res.statusCode} :: ${uuid} - ${url}`, userId)
           response.statusCode = res.statusCode
-          response.error = `ISYreq: url: ${url} :: statuscode ${res.statusCode} :: ${JSON.stringify(res.body)}`
           await isyGetNodeServer(cmd, fullMsg)
           return response
         }
@@ -697,7 +700,7 @@ async function makeIsyRequest(cmd, fullMsg, api, userId, id = false, fullRespons
         }
         response.statusCode = res.statusCode
         response.elapsed = process.hrtime(hrstart)[1]/1000000 + 'ms'
-        LOGGER.debug(`${response.statusCode} :: ${response.elapsed} - ${url}`, userId)
+        LOGGER.debug(`${response.statusCode} :: ${uuid} :: ${response.elapsed} - ${url}`, userId)
         break
       } catch (err) {
         if (i >= MAX_RETRIES) {
@@ -840,7 +843,7 @@ async function processMessage(message) {
   }
   //; ({userId} = message)
   //notificationTopic = `${process.env.STAGE}/frontend/${userId}`
-  LOGGER.debug(JSON.stringify(message), message.userId)
+  //LOGGER.debug(JSON.stringify(message), message.userId)
   for (let key in message) {
     if (['userId', 'id', 'topic', 'profileNum'].includes(key)) { continue }
     try {
