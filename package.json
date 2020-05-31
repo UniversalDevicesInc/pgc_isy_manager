@@ -2,7 +2,7 @@
   "author": "James Milne (milne.james@gmail.com)",
   "license": "MIT",
   "name": "pgc_isy_manager",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Polyglot v2 Swarm ISY Manager",
   "main": "isy_manager.js",
   "scripts": {
