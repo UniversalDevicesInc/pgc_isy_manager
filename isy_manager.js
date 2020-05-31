@@ -669,49 +669,49 @@ async function makeIsyRequest(cmd, fullMsg, api, userId, id = false, fullRespons
       timeout: 5000,
       gzip: true,
     }
-    for (let i = 0; i <= MAX_RETRIES; i++) {
-      try {
-        let res = await rp(apiOptions)
-        if (res && (res.statusCode === 500 || res.statusCode === 401 || res.statusCode === 503)) {
-          LOGGER.error(`${res.statusCode} :: ${uuid} - ${url} :: ${JSON.stringify(res.body)}`, userId)
-          response.statusCode = res.statusCode
-          response.error = `ISYreq: url: ${url} :: statuscode ${res.statusCode} :: ${JSON.stringify(res.body)}`
-          return response
-        }
-        if (res && res.statusCode === 404) {
-          LOGGER.error(`${res.statusCode} :: ${uuid} - ${url}`, userId)
-          response.statusCode = res.statusCode
-          await isyGetNodeServer(cmd, fullMsg)
-          return response
-        }
-        if (res && res.statusCode === 200) { response.success = true }
-        // LOGGER.debug(`${JSON.stringify(response)}`, userId)
-        if (fullResponse) {
-          try {
-            response.json = JSON.parse(res.body)
-          } catch (error) {
-            if (error instanceof SyntaxError) {
-              response.json = xmlparser.xml2json(res.body)
-            } else {
-              LOGGER.error(`ISYreq: ${error.stack}`, userId)
-              response.error = `${error.stack}`
-            }
+    // for (let i = 0; i <= MAX_RETRIES; i++) {
+    try {
+      let res = await rp(apiOptions)
+      if (res && (res.statusCode === 500 || res.statusCode === 503)) {
+        LOGGER.error(`${res.statusCode} :: ${uuid} - ${url} :: ${JSON.stringify(res.body)}`, userId)
+        response.statusCode = res.statusCode
+        response.error = `ISYreq: url: ${url} :: statuscode ${res.statusCode} :: ${JSON.stringify(res.body)}`
+        return response
+      }
+      if (res && res.statusCode === 404 || res.statusCode === 401) {
+        LOGGER.error(`${res.statusCode} :: ${uuid} - ${url}`, userId)
+        response.statusCode = res.statusCode
+        // await isyGetNodeServer(cmd, fullMsg)
+        return response
+      }
+      if (res && res.statusCode === 200) { response.success = true }
+      // LOGGER.debug(`${JSON.stringify(response)}`, userId)
+      if (fullResponse) {
+        try {
+          response.json = JSON.parse(res.body)
+        } catch (error) {
+          if (error instanceof SyntaxError) {
+            response.json = xmlparser.xml2json(res.body)
+          } else {
+            LOGGER.error(`ISYreq: ${error.stack}`, userId)
+            response.error = `${error.stack}`
           }
         }
-        response.statusCode = res.statusCode
-        response.elapsed = process.hrtime(hrstart)[1]/1000000 + 'ms'
-        LOGGER.debug(`${response.statusCode} :: ${uuid} :: ${response.elapsed} - ${url}`, userId)
-        break
-      } catch (err) {
-        if (i >= MAX_RETRIES) {
-          LOGGER.error(`connection exceeded max re-tries. Aborting. ${err.message}`, userId)
-          response.error = err.message
-          return response
-        } else {
-          LOGGER.error(`connection failed. Retrying... ${err.message}`, userId)
-        }
+      }
+      response.statusCode = res.statusCode
+      response.elapsed = process.hrtime(hrstart)[1]/1000000 + 'ms'
+      LOGGER.debug(`${response.statusCode} :: ${uuid} :: ${response.elapsed} - ${url}`, userId)
+      break
+    } catch (err) {
+      // if (i >= MAX_RETRIES) {
+      //   LOGGER.error(`connection exceeded max re-tries. Aborting. ${err.message}`, userId)
+      //   response.error = err.message
+      //   return response
+      // } else {
+        LOGGER.error(`connection failed. ${err.message}`, userId)
       }
     }
+  //  }
   } catch (err) {
     LOGGER.error(`ISYreqouter: ${err.stack}`, userId)
     response.error = `${err.stack}`
