@@ -701,7 +701,7 @@ async function makeIsyRequest(cmd, fullMsg, api, userId, id = false, fullRespons
       response.statusCode = res.statusCode
       response.elapsed = process.hrtime(hrstart)[1]/1000000 + 'ms'
       LOGGER.debug(`${response.statusCode} :: ${uuid} :: ${response.elapsed} - ${url}`, userId)
-      break
+      // break
     } catch (err) {
       // if (i >= MAX_RETRIES) {
       //   LOGGER.error(`connection exceeded max re-tries. Aborting. ${err.message}`, userId)
@@ -709,7 +709,7 @@ async function makeIsyRequest(cmd, fullMsg, api, userId, id = false, fullRespons
       //   return response
       // } else {
         LOGGER.error(`connection failed. ${err.message}`, userId)
-      }
+    //  }
     }
   //  }
   } catch (err) {
